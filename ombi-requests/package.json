@@ -1,0 +1,17 @@
+{
+  "name": "ombi-requests",
+  "version": "1.1.4",
+  "author": "probably-runs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/probably-runs/grease-scripts.git",
+    "directory": "ombi-requests"
+  },
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "node --check src/core.js && node --check src/userscript-body.js && node --check scripts/build.mjs",
+    "test": "node --test"
+  }
+}

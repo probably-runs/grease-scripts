@@ -1,0 +1,12 @@
+{
+  "name": "grease-scripts",
+  "private": true,
+  "workspaces": [
+    "ombi-requests"
+  ],
+  "scripts": {
+    "build": "npm --workspace ombi-requests run build",
+    "check": "npm --workspace ombi-requests run check",
+    "test": "npm --workspace ombi-requests test"
+  }
+}

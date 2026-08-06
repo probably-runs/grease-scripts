@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta property="og:title" content="A ★★★★★ review of Kill Bill: Vol. 1 (2003)">
+    <title>Letterboxd member review fixture</title>
+    <script type="application/ld+json">
+        /* <![CDATA[ */
+        {"@type":"Review","itemReviewed":{"@type":"Movie","name":"Kill Bill: Vol. 1","sameAs":"https://letterboxd.com/film/kill-bill-vol-1/"}}
+        /* ]]> */
+    </script>
+    <script>
+        window.__OMBI_REQUEST_TEST_INPUT__ = {
+            hostname: "letterboxd.com",
+            pathname: "/example-member/film/kill-bill-vol-1/",
+            pageUrl: "https://letterboxd.com/example-member/film/kill-bill-vol-1/"
+        };
+        const savedConfig = {
+            baseUrl: "https://mock-ombi.test/ombi",
+            apiKey: "mock-api-key",
+            userName: "test-user",
+            qualityProfileOverrides: {}
+        };
+        window.GM = {
+            async getValue() { return savedConfig; },
+            async setValue() {},
+            registerMenuCommand() {},
+            xmlHttpRequest(options) {
+                document.documentElement.dataset.ombiLastRequest = JSON.stringify({
+                    method: options.method,
+                    url: options.url,
+                    data: options.data || null
+                });
+                let payload;
+                if (options.url.includes("/api/v2/Search/multi/")) {
+                    payload = [
+                        { id: "24", title: "Kill Bill: Vol. 1 (2003)", mediaType: "movie" },
+                        { id: "1502241", title: "Short Cuts : KILL BILL VOL.1 (2025)", mediaType: "movie" }
+                    ];
+                } else if (options.url.endsWith("/api/v2/Search/movie/24")) {
+                    payload = { id: 24, title: "Kill Bill: Vol. 1", requested: false, available: false };
+                } else {
+                    payload = { result: true, requestId: 42 };
+                }
+                queueMicrotask(() => options.onload({
+                    status: 200,
+                    responseText: JSON.stringify(payload)
+                }));
+            }
+        };
+    </script>
+</head>
+<body>
+    <main>
+        <h1>Review by example-reviewer</h1>
+        <h2><a href="/film/kill-bill-vol-1/">Kill Bill: Vol. 1</a></h2>
+        <a href="/films/year/2003/">2003</a>
+    </main>
+    <script src="../../dist/ombi-request.user.js"></script>
+</body>
+</html>
