@@ -4,5 +4,5 @@ A collection of browser userscripts maintained by [probably-runs](https://github
 
 ## Scripts
 
-- [Ombi Requests](ombi-requests/) — request movies and TV shows in Ombi while browsing IMDb or Letterboxd.
+- [Ombi Requests](ombi-requests/) — request movies and TV shows in Ombi while browsing IMDb, Letterboxd, or Rotten Tomatoes.
 

@@ -36,11 +36,12 @@ const [core, body] = await Promise.all([
     fs.readFile(path.join(root, "src", "userscript-body.js"), "utf8"),
 ]);
 
+// Keep the name and namespace stable so userscript managers retain the installed script's settings.
 const metadata = `// ==UserScript==
 // @name         Ombi Request for IMDb & Letterboxd
 // @namespace    io.github.probably-runs.ombi-request
-// @version      1.1.4
-// @description  Request movies and TV shows in Ombi from IMDb or Letterboxd.
+// @version      1.2.0
+// @description  Request movies and TV shows in Ombi from IMDb, Letterboxd, or Rotten Tomatoes.
 // @author       probably-runs
 ${repositoryMetadata}// @match        https://www.imdb.com/title/*
 // @match        https://imdb.com/title/*
@@ -49,6 +50,10 @@ ${repositoryMetadata}// @match        https://www.imdb.com/title/*
 // @match        https://www.letterboxd.com/*
 // @match        https://letterboxd.com/*/film/*
 // @match        https://www.letterboxd.com/*/film/*
+// @match        https://www.rottentomatoes.com/m/*
+// @match        https://rottentomatoes.com/m/*
+// @match        https://www.rottentomatoes.com/tv/*
+// @match        https://rottentomatoes.com/tv/*
 // @grant        GM.getValue
 // @grant        GM.setValue
 // @grant        GM.registerMenuCommand

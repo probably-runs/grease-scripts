@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Ombi Request for IMDb & Letterboxd
 // @namespace    io.github.probably-runs.ombi-request
-// @version      1.1.4
-// @description  Request movies and TV shows in Ombi from IMDb or Letterboxd.
+// @version      1.2.0
+// @description  Request movies and TV shows in Ombi from IMDb, Letterboxd, or Rotten Tomatoes.
 // @author       probably-runs
 // @homepageURL  https://github.com/probably-runs/grease-scripts/tree/main/ombi-requests
 // @supportURL   https://github.com/probably-runs/grease-scripts/issues
@@ -13,6 +13,10 @@
 // @match        https://www.letterboxd.com/*
 // @match        https://letterboxd.com/*/film/*
 // @match        https://www.letterboxd.com/*/film/*
+// @match        https://www.rottentomatoes.com/m/*
+// @match        https://rottentomatoes.com/m/*
+// @match        https://www.rottentomatoes.com/tv/*
+// @match        https://rottentomatoes.com/tv/*
 // @grant        GM.getValue
 // @grant        GM.setValue
 // @grant        GM.registerMenuCommand
@@ -184,10 +188,67 @@
         };
     }
 
+    function detectRottenTomatoesPage(input) {
+        const pathname = String(input.pathname || "");
+        const isMovie = /^\/m\/[^/]+\/?$/i.test(pathname);
+        const isTv = /^\/tv\/[^/]+(?:\/s\d+(?:\/e\d+)?)?\/?$/i.test(pathname);
+        if (!isMovie && !isTv) return null;
+
+        const isEpisode = /\/s\d+\/e\d+\/?$/i.test(pathname);
+        const isSeason = !isEpisode && /\/s\d+\/?$/i.test(pathname);
+        const wantedType = isMovie ? "Movie" : isEpisode ? "TVEpisode" : isSeason ? "TVSeason" : "TVSeries";
+        const jsonLd = input.jsonLd || [];
+        const schema = jsonLd.find((item) => schemaTypes(item).includes(wantedType))
+            || (!isMovie && jsonLd.find((item) => schemaTypes(item).some(
+                (type) => type === "TVSeries" || type === "TVMiniSeries",
+            )));
+        if (!schema && jsonLd.some(isTitleSchema)) return null;
+
+        let titleSchema = schema;
+        if (isSeason || isEpisode) {
+            const isSeriesSchema = schemaTypes(schema).some(
+                (type) => type === "TVSeries" || type === "TVMiniSeries",
+            );
+            if (!isSeriesSchema) {
+                const parent = schema && (schema.partOfSeries || schema.partOfSeason?.partOfSeries);
+                const reference = typeof parent === "string" ? parent : parent && parent["@id"];
+                titleSchema = parent && typeof parent === "object" && parent.name
+                    ? parent
+                    : jsonLd.find((item) => reference && item["@id"] === reference);
+            }
+            // An episode/season title and release date cannot identify a full-series request.
+            if (!compactText(titleSchema && titleSchema.name)) return null;
+        }
+
+        // Generic page links may belong to recommendations, cast credits, or other titles.
+        const candidateUrls = titleSchema ? [
+            ...asArray(titleSchema.sameAs), titleSchema.url, titleSchema["@id"],
+        ] : [];
+        const title = compactText((titleSchema && titleSchema.name) || input.heading || input.ogTitle)
+            .replace(/\s*\|\s*Rotten Tomatoes\s*$/i, "");
+        if (!title) return null;
+
+        return {
+            source: "rottentomatoes",
+            mediaType: isMovie ? "movie" : "tv",
+            imdbId: findUrl(candidateUrls, extractImdbId),
+            tmdbId: isMovie ? findUrl(candidateUrls, extractTmdbMovieId) : null,
+            title,
+            year: findUrl([
+                titleSchema && titleSchema.startDate,
+                titleSchema && titleSchema.dateCreated,
+                // Nested pages' visible dates describe the season/episode, not the series.
+                !(isSeason || isEpisode) && input.yearText,
+            ], extractYear),
+            pageUrl: input.pageUrl,
+        };
+    }
+
     function detectPage(input) {
         const host = String(input.hostname || "").replace(/^www\./, "").toLowerCase();
         if (host === "imdb.com") return detectImdbPage(input);
         if (host === "letterboxd.com") return detectLetterboxdPage(input);
+        if (host === "rottentomatoes.com") return detectRottenTomatoesPage(input);
         return null;
     }
 
@@ -228,18 +289,19 @@
         const withoutYear = (value) => compactText(value)
             .replace(/\s*\((18|19|20|21)\d{2}\)\s*$/, "");
         const expectedTitle = normalizeTitle(withoutYear(media && media.title));
+        if (!expectedTitle) return null;
         const candidates = (results || []).filter((item) =>
             String(item && item.mediaType || "").toLowerCase().includes("movie"),
         );
         const exact = candidates.filter(
             (item) => normalizeTitle(withoutYear(item && item.title)) === expectedTitle,
         );
-        const expectedYear = Number(media && media.year);
-        if (Number.isInteger(expectedYear)) {
-            const byYear = exact.filter((item) => extractYear(
-                item.releaseDate || item.release_date || item.year || item.title,
-            ) === expectedYear);
-            if (byYear.length) return byYear[0];
+        const expectedYear = extractYear(media && media.year);
+        if (expectedYear) {
+            const byYear = exact.filter((item) => [
+                item.releaseDate, item.release_date, item.year, item.title,
+            ].map(extractYear).find(Boolean) === expectedYear);
+            return byYear.length === 1 ? byYear[0] : null;
         }
         return exact.length === 1 ? exact[0] : null;
     }
@@ -295,19 +357,33 @@
 
     function matchingTvDetails(detailResults, media) {
         const imdbId = extractImdbId(media && media.imdbId);
+        const detailsImdbId = (item) => {
+            const external = item && item.externalIds;
+            return extractImdbId(
+                (external && (external.imdbId || external.imdb_id)) || (item && item.imdbId),
+            );
+        };
         if (imdbId) {
-            const byImdb = (detailResults || []).find((item) => {
-                const external = item && item.externalIds;
-                return extractImdbId(
-                    (external && (external.imdbId || external.imdb_id)) || item.imdbId,
-                ) === imdbId;
-            });
+            const byImdb = (detailResults || []).find((item) => detailsImdbId(item) === imdbId);
             if (byImdb) return byImdb;
         }
 
-        const exact = (detailResults || []).filter(
-            (item) => normalizeTitle(item && item.title) === normalizeTitle(media && media.title),
-        );
+        const withoutYear = (value) => compactText(value)
+            .replace(/\s*\((18|19|20|21)\d{2}\)\s*$/, "");
+        const expectedTitle = normalizeTitle(withoutYear(media && media.title));
+        if (!expectedTitle) return null;
+        const exact = (detailResults || []).filter((item) => {
+            if (imdbId && detailsImdbId(item)) return false;
+            return normalizeTitle(withoutYear(item && item.title)) === expectedTitle;
+        });
+        const expectedYear = extractYear(media && media.year);
+        if (expectedYear) {
+            const byYear = exact.filter((item) => [
+                item.firstAired, item.firstAirDate, item.first_air_date, item.releaseDate,
+                item.release_date, item.year, item.title,
+            ].map(extractYear).find(Boolean) === expectedYear);
+            return byYear.length === 1 ? byYear[0] : null;
+        }
         return exact.length === 1 ? exact[0] : null;
     }
 
@@ -438,6 +514,7 @@
         const liveInput = {
             externalUrls,
             heading:
+                document.querySelector('media-hero [slot="title"]')?.textContent ||
                 document.querySelector("main h1")?.textContent ||
                 document.querySelector("h1")?.textContent ||
                 "",
@@ -452,6 +529,8 @@
             } : null,
             tmdbDataId: tmdbNode?.getAttribute("data-tmdb-id") || "",
             yearText:
+                Array.from(document.querySelectorAll('media-hero [slot="metadata-prop"]'))
+                    .map((node) => node.textContent || "").join(" ") ||
                 document.querySelector("[data-testid='hero-title-block__metadata']")?.textContent ||
                 document.querySelector(".releaseyear")?.textContent ||
                 document.querySelector('main a[href^="/films/year/"]')?.textContent ||
@@ -479,7 +558,7 @@
         const candidate = Core.matchingMovieCandidate(results, state.media);
         const id = Number(candidate?.id || candidate?.theMovieDbId);
         if (!Number.isInteger(id) || id <= 0) {
-            throw new Error("Ombi could not uniquely match this Letterboxd movie.");
+            throw new Error("Ombi could not uniquely match this movie. Open Ombi to choose the right one.");
         }
         return api(`/api/v2/Search/movie/${id}`);
     }

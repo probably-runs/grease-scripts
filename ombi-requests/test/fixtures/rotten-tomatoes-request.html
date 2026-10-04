@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rotten Tomatoes Ombi integration fixture</title>
+    <style>
+        body { margin:0; min-height:100vh; background:#101820; color:#f5f5f5; font:16px/1.5 system-ui,sans-serif; }
+        main { max-width:900px; margin:70px auto; padding:30px; }
+        h1 { font-size:36px; }
+        media-hero, rt-text { display:block; }
+        media-hero [slot="title"] { font-size:28px; margin-bottom:12px; }
+        media-hero [slot="metadata-prop"] { display:inline-block; margin-right:12px; }
+        #fixture-status { color:#a9bfd6; }
+        #auth-title-decoy { display:none; }
+    </style>
+</head>
+<body>
+    <!-- Live RT has an authentication slot="title" before its media hero. -->
+    <rt-text id="auth-title-decoy" slot="title">Welcome back!</rt-text>
+    <main>
+        <p id="fixture-status">Loading sanitized Rotten Tomatoes markup…</p>
+        <section id="fixture-content"></section>
+    </main>
+    <script>
+        "use strict";
+
+        const params = new URLSearchParams(location.search);
+        const page = params.get("page") || "movie";
+        const ambiguous = params.get("ambiguous") === "1";
+        const withoutSchema = params.get("schema") === "0" && ["movie", "series"].includes(page);
+        const paths = {
+            movie: "/m/shawshank_redemption",
+            series: "/tv/breaking_bad",
+            season: "/tv/breaking_bad/s05",
+            episode: "/tv/breaking_bad/s05/e14"
+        };
+
+        window.__OMBI_REQUEST_LOG__ = [];
+        document.documentElement.dataset.ombiRequestCount = "0";
+        document.documentElement.dataset.ombiSubmissionCount = "0";
+
+        const savedConfig = {
+            baseUrl: "https://mock-ombi.test/ombi",
+            apiKey: "mock-api-key",
+            userName: "test-user",
+            qualityProfileOverrides: {}
+        };
+
+        function responseFor(options) {
+            const url = new URL(options.url);
+            if (url.origin !== "https://mock-ombi.test") {
+                return { status: 500, payload: { errorMessage: "Unexpected mock origin." } };
+            }
+
+            const method = String(options.method || "GET").toUpperCase();
+            const path = decodeURIComponent(url.pathname);
+            let body = null;
+            try {
+                body = options.data ? JSON.parse(options.data) : null;
+            } catch {
+                return { status: 500, payload: { errorMessage: "Invalid mock request JSON." } };
+            }
+
+            if (method === "POST" && path === "/ombi/api/v2/Search/multi/The Shawshank Redemption") {
+                const results = [
+                    { id: 92780, title: "The Shawshank Redemption (2020)", mediaType: "movie" },
+                    { id: 278, title: "The Shawshank Redemption (1994)", mediaType: "movie" }
+                ];
+                if (ambiguous) results.push({ id: 92781, title: "The Shawshank Redemption (1994)", mediaType: "movie" });
+                return { status: 200, payload: results };
+            }
+            if (method === "GET" && path === "/ombi/api/v2/Search/movie/278") {
+                return { status: 200, payload: { id: 278, title: "The Shawshank Redemption", releaseDate: "1994-09-01", requested: false, available: false } };
+            }
+            if (method === "POST" && path === "/ombi/api/v2/Search/multi/Breaking Bad") {
+                const results = [{ id: 1396, title: "Breaking Bad", mediaType: "tv" }];
+                if (ambiguous) results.push({ id: 2396, title: "Breaking Bad", mediaType: "tv" });
+                return { status: 200, payload: results };
+            }
+            if (method === "GET" && path === "/ombi/api/v2/Search/tv/moviedb/1396") {
+                return { status: 200, payload: { id: 1396, title: "Breaking Bad", firstAired: "2008-01-20", requested: false, available: false } };
+            }
+            if (ambiguous && method === "GET" && path === "/ombi/api/v2/Search/tv/moviedb/2396") {
+                return { status: 200, payload: { id: 2396, title: "Breaking Bad", firstAired: "2008-01-20", requested: false, available: false } };
+            }
+            if (method === "POST" && path === "/ombi/api/v1/Request/movie" && body?.theMovieDbId === 278) {
+                return { status: 200, payload: { result: true, requestId: 42 }, submission: true };
+            }
+            if (method === "POST" && path === "/ombi/api/v2/Requests/tv" && body?.theMovieDbId === 1396 && body?.requestAll === true) {
+                return { status: 200, payload: { result: true, requestId: 43 }, submission: true };
+            }
+            if (method === "GET" && path === "/ombi/api/v1/Status/info") {
+                return { status: 200, payload: "4.53.10" };
+            }
+            if (method === "GET" && path === "/ombi/api/v1/Radarr/Profiles") {
+                return { status: 200, payload: [{ id: 1, name: "Any" }, { id: 4, name: "1080" }] };
+            }
+            if (method === "GET" && path === "/ombi/api/v1/Sonarr/Profiles") {
+                return { status: 200, payload: [{ id: 1, name: "Any" }, { id: 4, name: "1080" }] };
+            }
+            return { status: 500, payload: { errorMessage: `Unexpected mock endpoint: ${method} ${path}` } };
+        }
+
+        window.GM = {
+            async getValue() { return savedConfig; },
+            async setValue(_key, value) {
+                window.__OMBI_SAVED_CONFIG__ = value;
+                document.documentElement.dataset.ombiSavedConfig = value;
+            },
+            registerMenuCommand() {},
+            xmlHttpRequest(options) {
+                const result = responseFor(options);
+                const entry = {
+                    method: options.method,
+                    url: options.url,
+                    data: options.data || null,
+                    status: result.status
+                };
+                window.__OMBI_REQUEST_LOG__.push(entry);
+                document.documentElement.dataset.ombiLastRequest = JSON.stringify(entry);
+                document.documentElement.dataset.ombiRequestLog = JSON.stringify(window.__OMBI_REQUEST_LOG__);
+                document.documentElement.dataset.ombiRequestCount = String(window.__OMBI_REQUEST_LOG__.length);
+                if (result.submission) {
+                    document.documentElement.dataset.ombiSubmissionCount = String(Number(document.documentElement.dataset.ombiSubmissionCount) + 1);
+                    document.documentElement.dataset.ombiSubmitted = options.data;
+                }
+                queueMicrotask(() => options.onload({ status: result.status, responseText: JSON.stringify(result.payload) }));
+            }
+        };
+
+        async function loadFixture() {
+            if (!Object.hasOwn(paths, page)) throw new Error(`Unknown fixture page: ${page}`);
+            const response = await fetch(`./rotten-tomatoes-${page}.html`);
+            if (!response.ok) throw new Error(`Could not load fixture: HTTP ${response.status}`);
+            const parsed = new DOMParser().parseFromString(await response.text(), "text/html");
+            const metadata = withoutSchema
+                ? parsed.querySelectorAll('meta[property="og:title"]')
+                : parsed.querySelectorAll('meta[property="og:title"], script[type="application/ld+json"]');
+            for (const node of metadata) document.head.appendChild(document.importNode(node, true));
+            const content = document.getElementById("fixture-content");
+            for (const node of parsed.body.childNodes) content.appendChild(document.importNode(node, true));
+
+            if (["127.0.0.1", "localhost"].includes(location.hostname)) {
+                window.__OMBI_REQUEST_TEST_INPUT__ = {
+                    hostname: "www.rottentomatoes.com",
+                    pathname: paths[page],
+                    pageUrl: `https://www.rottentomatoes.com${paths[page]}`
+                };
+            }
+            document.documentElement.dataset.ombiFixturePage = page;
+            document.documentElement.dataset.ombiFixtureSchema = withoutSchema ? "0" : "1";
+            document.documentElement.dataset.ombiFixtureAmbiguous = ambiguous ? "1" : "0";
+            document.getElementById("fixture-status").textContent = `Mock requests only · ${page} page · ${withoutSchema ? "DOM metadata" : "JSON-LD metadata"}${ambiguous ? " · ambiguous results" : ""}`;
+
+            const script = document.createElement("script");
+            script.src = "../../dist/ombi-request.user.js";
+            script.onload = () => { document.documentElement.dataset.ombiFixtureLoaded = "true"; };
+            script.onerror = () => { document.documentElement.dataset.ombiFixtureError = "Could not load built userscript."; };
+            document.body.appendChild(script);
+        }
+
+        function start() {
+            loadFixture().catch((error) => {
+                document.documentElement.dataset.ombiFixtureError = error.message;
+                document.getElementById("fixture-status").textContent = error.message;
+            });
+        }
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });
+        else start();
+    </script>
+</body>
+</html>

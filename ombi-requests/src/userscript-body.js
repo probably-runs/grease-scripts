@@ -89,6 +89,7 @@
         const liveInput = {
             externalUrls,
             heading:
+                document.querySelector('media-hero [slot="title"]')?.textContent ||
                 document.querySelector("main h1")?.textContent ||
                 document.querySelector("h1")?.textContent ||
                 "",
@@ -103,6 +104,8 @@
             } : null,
             tmdbDataId: tmdbNode?.getAttribute("data-tmdb-id") || "",
             yearText:
+                Array.from(document.querySelectorAll('media-hero [slot="metadata-prop"]'))
+                    .map((node) => node.textContent || "").join(" ") ||
                 document.querySelector("[data-testid='hero-title-block__metadata']")?.textContent ||
                 document.querySelector(".releaseyear")?.textContent ||
                 document.querySelector('main a[href^="/films/year/"]')?.textContent ||
@@ -130,7 +133,7 @@
         const candidate = Core.matchingMovieCandidate(results, state.media);
         const id = Number(candidate?.id || candidate?.theMovieDbId);
         if (!Number.isInteger(id) || id <= 0) {
-            throw new Error("Ombi could not uniquely match this Letterboxd movie.");
+            throw new Error("Ombi could not uniquely match this movie. Open Ombi to choose the right one.");
         }
         return api(`/api/v2/Search/movie/${id}`);
     }
