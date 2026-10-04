@@ -28,7 +28,15 @@ A Greasemonkey/Tampermonkey-compatible userscript that adds a floating **Request
 
 Ombi API keys provide administrator-level API access. The script stores the key only in the userscript manager. Prefer HTTPS when the Ombi URL is reachable outside the local network.
 
-Existing users can update the installed script from the same link. Its userscript name, namespace, and saved Ombi settings stay the same; version 1.2.0 adds Rotten Tomatoes page permissions. TV requests still request the full series, including when browsing a Rotten Tomatoes season or episode. If a season or episode page omits its parent-series metadata, the button is hidden.
+## Update an existing installation
+
+Saved settings are retained when the userscript manager updates the existing installation with the same script name and namespace. The public build uses namespace `io.github.probably-runs.ombi-request`; users already running that build can update from the install link above.
+
+Original installations, including version 1.1.2, named **Ombi Request for IMDb & Letterboxd** with namespace `https://ombi.io/` need the [legacy compatibility update](https://github.com/probably-runs/grease-scripts/raw/main/ombi-requests/dist/ombi-request-legacy.user.js). This build retains that original name and namespace, and uses the same runtime and settings keys as the public build.
+
+If installing the public build created a second entry in Greasemonkey, disable that duplicate (namespace `io.github.probably-runs.ombi-request`) and keep the original entry. Open the legacy compatibility link and check that Greasemonkey replaces the original 1.1.2 entry rather than installing another copy. Then refresh a Rotten Tomatoes page and verify that the saved Ombi settings are available. Do not delete the original installation or copy API keys between scripts.
+
+Rotten Tomatoes support adds movie and TV page permissions. TV requests request the full series, including when browsing a Rotten Tomatoes season or episode. If a season or episode page omits its parent-series metadata, the button is hidden.
 
 ## Permissions and privacy
 
@@ -45,8 +53,8 @@ npm run build
 npm run check
 ```
 
-The generated cross-browser userscript is `dist/ombi-request.user.js`.
+The generated cross-browser userscripts are `dist/ombi-request.user.js` (public installation identity) and `dist/ombi-request-legacy.user.js` (original installation identity).
 
 For browser smoke tests, run `npm --workspace ombi-requests run fixtures`, then open the printed localhost URL. The fixture uses sanitized Rotten Tomatoes markup and a mock Ombi API. Use `?page=movie`, `?page=series`, `?page=season`, or `?page=episode`; add `&schema=0` to test movie/series DOM fallbacks or `&ambiguous=1` to test manual selection. Clicking the request button sends only a mock request. Stop the server with Ctrl+C.
 
-The userscript namespace is stable and does not depend on the repository location. Set `OMBI_REQUEST_REPOSITORY_URL` to the public repository URL and `OMBI_REQUEST_REPOSITORY_DIRECTORY` to its subdirectory before running `npm run build`; the builder adds `@homepageURL` and `@supportURL` without changing the script identity.
+Each build's userscript namespace is stable and does not depend on the repository location. Set `OMBI_REQUEST_REPOSITORY_URL` to the public repository URL and `OMBI_REQUEST_REPOSITORY_DIRECTORY` to its subdirectory before running `npm run build`; the builder adds `@homepageURL` and `@supportURL` without changing either script identity.

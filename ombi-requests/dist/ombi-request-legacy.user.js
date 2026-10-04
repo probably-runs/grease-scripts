@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Ombi Request for IMDb & Letterboxd
-// @namespace    io.github.probably-runs.ombi-request
+// @namespace    https://ombi.io/
 // @version      1.2.1
 // @description  Request movies and TV shows in Ombi from IMDb, Letterboxd, or Rotten Tomatoes.
 // @author       probably-runs

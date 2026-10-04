@@ -1,6 +1,6 @@
 {
   "name": "ombi-requests",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": "probably-runs",
   "license": "MIT",
   "repository": {
@@ -11,7 +11,7 @@
   "private": true,
   "scripts": {
     "build": "node scripts/build.mjs",
-    "check": "node --check src/core.js && node --check src/userscript-body.js && node --check scripts/build.mjs && node --check scripts/serve-fixtures.mjs && node --check dist/ombi-request.user.js",
+    "check": "node --check src/core.js && node --check src/userscript-body.js && node --check scripts/build.mjs && node --check scripts/serve-fixtures.mjs && node --check dist/ombi-request.user.js && node --check dist/ombi-request-legacy.user.js",
     "fixtures": "node scripts/serve-fixtures.mjs",
     "test": "node --test"
   }

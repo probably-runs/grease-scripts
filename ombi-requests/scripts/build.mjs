@@ -31,16 +31,19 @@ if (repositoryUrlInput) {
 } else if (repositoryDirectoryInput) {
     throw new Error("OMBI_REQUEST_REPOSITORY_DIRECTORY requires OMBI_REQUEST_REPOSITORY_URL.");
 }
-const [core, body] = await Promise.all([
+const [core, body, packageText] = await Promise.all([
     fs.readFile(path.join(root, "src", "core.js"), "utf8"),
     fs.readFile(path.join(root, "src", "userscript-body.js"), "utf8"),
+    fs.readFile(path.join(root, "package.json"), "utf8"),
 ]);
+const { version } = JSON.parse(packageText);
 
-// Keep the name and namespace stable so userscript managers retain the installed script's settings.
-const metadata = `// ==UserScript==
+// Each installed identity needs its own update artifact to retain its manager-owned settings.
+function metadata(namespace) {
+    return `// ==UserScript==
 // @name         Ombi Request for IMDb & Letterboxd
-// @namespace    io.github.probably-runs.ombi-request
-// @version      1.2.0
+// @namespace    ${namespace}
+// @version      ${version}
 // @description  Request movies and TV shows in Ombi from IMDb, Letterboxd, or Rotten Tomatoes.
 // @author       probably-runs
 ${repositoryMetadata}// @match        https://www.imdb.com/title/*
@@ -61,9 +64,15 @@ ${repositoryMetadata}// @match        https://www.imdb.com/title/*
 // @connect      *
 // @run-at       document-idle
 // ==/UserScript==`;
+}
 
-const output = `${metadata}\n\n${core.trim()}\n\n${body.trim()}\n`;
 const dist = path.join(root, "dist");
 await fs.mkdir(dist, { recursive: true });
-await fs.writeFile(path.join(dist, "ombi-request.user.js"), output, "utf8");
-console.log(`Built ${path.join(dist, "ombi-request.user.js")}`);
+for (const [filename, namespace] of [
+    ["ombi-request.user.js", "io.github.probably-runs.ombi-request"],
+    ["ombi-request-legacy.user.js", "https://ombi.io/"],
+]) {
+    const output = `${metadata(namespace)}\n\n${core.trim()}\n\n${body.trim()}\n`;
+    await fs.writeFile(path.join(dist, filename), output, "utf8");
+    console.log(`Built ${path.join(dist, filename)}`);
+}
